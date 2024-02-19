@@ -1,0 +1,40 @@
+import com.alibaba.excel.write.handler.AbstractRowWriteHandler;
+import com.alibaba.excel.write.handler.context.RowWriteHandlerContext;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.util.CellRangeAddress;
+
+public class MergeStrategy extends AbstractRowWriteHandler {
+
+    private int mergeColumnIndex; // 需要合并单元格的列索引
+    private int startRowIndex = 1; // 开始合并的行索引，跳过表头
+
+    public MergeStrategy(int mergeColumnIndex) {
+        this.mergeColumnIndex = mergeColumnIndex;
+    }
+
+    @Override
+    public void afterRowDispose(RowWriteHandlerContext context) {
+        // 获取当前行和上一行
+        Row currentRow = context.getRow();
+        int currentRowIndex = currentRow.getRowNum();
+        if (currentRowIndex == startRowIndex) {
+            return; // 如果是第一行数据（跳过表头），不进行处理
+        }
+        Row previousRow = context.getWriteSheetHolder().getSheet().getRow(currentRowIndex - 1);
+
+        // 获取当前行和上一行的typeOfHours单元格
+        Cell currentCell = currentRow.getCell(mergeColumnIndex);
+        Cell previousCell = previousRow.getCell(mergeColumnIndex);
+
+        // 比较当前行和上一行的typeOfHours是否相同
+        if (currentCell != null && previousCell != null && currentCell.getStringCellValue().equals(previousCell.getStringCellValue())) {
+            // 如果相同，合并这两行的typeOfHours单元格
+            CellRangeAddress cellRangeAddress = new CellRangeAddress(previousRow.getRowNum(), currentRow.getRowNum(), mergeColumnIndex, mergeColumnIndex);
+            context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
+        } else {
+            // 如果不相同，更新startRowIndex为当前行
+            startRowIndex = currentRowIndex;
+        }
+    }
+}
