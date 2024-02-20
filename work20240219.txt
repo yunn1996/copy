@@ -1,39 +1,5 @@
-import com.alibaba.excel.write.handler.AbstractRowWriteHandler;
-import com.alibaba.excel.write.handler.context.RowWriteHandlerContext;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.util.CellRangeAddress;
-
-public class MergeStrategy extends AbstractRowWriteHandler {
-
-    private int mergeColumnIndex; // 需要合并单元格的列索引
-    private Integer startRowIndex = null; // 开始合并的行索引，初始为null
-    private String lastContent = null; // 上一行单元格内容
-
-    public MergeStrategy(int mergeColumnIndex) {
-        this.mergeColumnIndex = mergeColumnIndex;
-    }
-
-    @Override
-    public void afterRowDispose(RowWriteHandlerContext context) {
-        Row currentRow = context.getRow();
-        int currentRowIndex = currentRow.getRowNum();
-        Cell currentCell = currentRow.getCell(mergeColumnIndex);
-        String currentContent = currentCell.getStringCellValue();
-
-        // 如果当前内容与上一内容不同，或者是最后一行，则尝试合并之前的单元格
-        if (lastContent != null && (!currentContent.equals(lastContent) || context.getWriteSheetHolder().getSheet().getLastRowNum() == currentRowIndex)) {
-            if (startRowIndex != null && currentRowIndex - startRowIndex > 1) { // 如果有超过1行的数据需要合并
-                CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRowIndex - 1, mergeColumnIndex, mergeColumnIndex);
-                context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
-            }
-            startRowIndex = currentRowIndex; // 重置开始合并的行索引
+ // 处理最后一行内容与之前行相同的情况
+        if (currentRowIndex == context.getWriteSheetHolder().getSheet().getLastRowNum() && currentContent.equals(lastContent)) {
+            CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRowIndex, mergeColumnIndex, mergeColumnIndex);
+            context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
         }
-
-        if (startRowIndex == null) {
-            startRowIndex = currentRowIndex; // 设置开始合并的行索引
-        }
-
-        lastContent = currentContent; // 更新上一内容
-    }
-}
