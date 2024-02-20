@@ -1,26 +1,33 @@
- Row currentRow = context.getRow();
-        int currentRowIndex = currentRow.getRowNum();
+ private int mergeColumnIndex; // 需要合并单元格的列索引
+    private Map<String, Integer> rowIndexMap; // 记录每个数据值对应的起始行索引
+    private CellStyle centerCellStyle; // 居中对齐的单元格样式
+
+    public MergeStrategy(int mergeColumnIndex, Sheet sheet) {
+        this.mergeColumnIndex = mergeColumnIndex;
+        this.rowIndexMap = new HashMap<>();
+        this.centerCellStyle = createCenterCellStyle(sheet);
+    }
+
+    private CellStyle createCenterCellStyle(Sheet sheet) {
+        CellStyle cellStyle = sheet.getWorkbook().createCellStyle();
+        cellStyle.setAlignment(CellStyle.ALIGN_CENTER);
+        cellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        return cellStyle;
+    }
+
+    @Override
+    public void afterRowDispose(RowWriteHandlerContext context) {
+        Row currentRow = context.getRow();
         Cell currentCell = currentRow.getCell(mergeColumnIndex);
         String currentContent = currentCell.getStringCellValue();
 
-        // 如果当前内容与上一内容不同，或者是最后一行，则尝试合并之前的单元格
-        if (lastContent != null && (!currentContent.equals(lastContent) || currentRowIndex == context.getWriteSheetHolder().getSheet().getLastRowNum())) {
-            if (startRowIndex != null && currentRowIndex - startRowIndex > 1) { // 如果有超过1行的数据需要合并
-                CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRowIndex - 1, mergeColumnIndex, mergeColumnIndex);
-                context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
-            }
-            startRowIndex = currentRowIndex; // 重置开始合并的行索引
-        }
-
-        if (startRowIndex == null) {
-            startRowIndex = currentRowIndex; // 设置开始合并的行索引
-        }
-
-        lastContent = currentContent; // 更新上一内容
-
-        // 处理最后一行内容与之前行相同的情况
-        if (currentRowIndex == context.getWriteSheetHolder().getSheet().getLastRowNum() && currentContent.equals(lastContent)) {
-            CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRowIndex, mergeColumnIndex, mergeColumnIndex);
+        if (rowIndexMap.containsKey(currentContent)) {
+            int startRowIndex = rowIndexMap.get(currentContent);
+            CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRow.getRowNum(), mergeColumnIndex, mergeColumnIndex);
             context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
+        } else {
+            rowIndexMap.put(currentContent, currentRow.getRowNum());
         }
+
+        currentCell.setCellStyle(centerCellStyle);
     }
