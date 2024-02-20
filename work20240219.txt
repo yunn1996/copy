@@ -1,5 +1,26 @@
- // 处理最后一行内容与之前行相同的情况
+ Row currentRow = context.getRow();
+        int currentRowIndex = currentRow.getRowNum();
+        Cell currentCell = currentRow.getCell(mergeColumnIndex);
+        String currentContent = currentCell.getStringCellValue();
+
+        // 如果当前内容与上一内容不同，或者是最后一行，则尝试合并之前的单元格
+        if (lastContent != null && (!currentContent.equals(lastContent) || currentRowIndex == context.getWriteSheetHolder().getSheet().getLastRowNum())) {
+            if (startRowIndex != null && currentRowIndex - startRowIndex > 1) { // 如果有超过1行的数据需要合并
+                CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRowIndex - 1, mergeColumnIndex, mergeColumnIndex);
+                context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
+            }
+            startRowIndex = currentRowIndex; // 重置开始合并的行索引
+        }
+
+        if (startRowIndex == null) {
+            startRowIndex = currentRowIndex; // 设置开始合并的行索引
+        }
+
+        lastContent = currentContent; // 更新上一内容
+
+        // 处理最后一行内容与之前行相同的情况
         if (currentRowIndex == context.getWriteSheetHolder().getSheet().getLastRowNum() && currentContent.equals(lastContent)) {
             CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRowIndex, mergeColumnIndex, mergeColumnIndex);
             context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
         }
+    }
