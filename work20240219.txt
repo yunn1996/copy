@@ -1,40 +1,68 @@
-import com.alibaba.excel.write.handler.AbstractRowWriteHandler;
-import com.alibaba.excel.write.handler.context.RowWriteHandlerContext;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.util.CellRangeAddress;
+public class ExcelFillCellMergeStrategy implements CellWriteHandler {
 
-public class MergeStrategy extends AbstractRowWriteHandler {
+    private int[] mergeColumnIndex;
+    private int mergeRowIndex;
+    
+    public ExcelFillCellMergeStrategy() {
+    }
 
-    private int mergeColumnIndex; // 需要合并单元格的列索引
-    private int startRowIndex = 1; // 开始合并的行索引，跳过表头
-
-    public MergeStrategy(int mergeColumnIndex) {
+    public ExcelFillCellMergeStrategy(int mergeRowIndex, int[] mergeColumnIndex) {
+        this.mergeRowIndex = mergeRowIndex;
         this.mergeColumnIndex = mergeColumnIndex;
     }
 
+
     @Override
-    public void afterRowDispose(RowWriteHandlerContext context) {
-        // 获取当前行和上一行
-        Row currentRow = context.getRow();
-        int currentRowIndex = currentRow.getRowNum();
-        if (currentRowIndex == startRowIndex) {
-            return; // 如果是第一行数据（跳过表头），不进行处理
-        }
-        Row previousRow = context.getWriteSheetHolder().getSheet().getRow(currentRowIndex - 1);
+    public void afterCellDispose(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder, List<CellData> list, Cell cell, Head head, Integer integer, Boolean aBoolean) {
+        //当前行
+        int curRowIndex = cell.getRowIndex();
+        //当前列
+        int curColIndex = cell.getColumnIndex();
 
-        // 获取当前行和上一行的typeOfHours单元格
-        Cell currentCell = currentRow.getCell(mergeColumnIndex);
-        Cell previousCell = previousRow.getCell(mergeColumnIndex);
-
-        // 比较当前行和上一行的typeOfHours是否相同
-        if (currentCell != null && previousCell != null && currentCell.getStringCellValue().equals(previousCell.getStringCellValue())) {
-            // 如果相同，合并这两行的typeOfHours单元格
-            CellRangeAddress cellRangeAddress = new CellRangeAddress(previousRow.getRowNum(), currentRow.getRowNum(), mergeColumnIndex, mergeColumnIndex);
-            context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
-        } else {
-            // 如果不相同，更新startRowIndex为当前行
-            startRowIndex = currentRowIndex;
+        if (curRowIndex > mergeRowIndex) {
+            for (int columnIndex : mergeColumnIndex) {
+                if (curColIndex == columnIndex) {
+                    mergeWithPrevRow(writeSheetHolder, cell, curRowIndex, curColIndex);
+                    break;
+                }
+            }
         }
     }
-}
+
+
+
+    /**
+     * 当前单元格向上合并
+     *
+     * @param cell             当前单元格
+     * @param curRowIndex      当前行
+     * @param curColIndex      当前列
+     */
+    private void mergeWithPrevRow(WriteSheetHolder writeSheetHolder, Cell cell, int curRowIndex, int curColIndex) {
+        //获取当前行的当前列的数据和上一行的当前列列数据，通过上一行数据是否相同进行合并
+        Object curData = cell.getCellTypeEnum() == CellType.STRING ? cell.getStringCellValue() : cell.getNumericCellValue();
+        Cell preCell = cell.getSheet().getRow(curRowIndex - 1).getCell(curColIndex);
+        Object preData = preCell.getCellTypeEnum() == CellType.STRING ? preCell.getStringCellValue() : preCell.getNumericCellValue();
+
+        // 比较当前行的第一列的单元格与上一行是否相同，相同合并当前单元格与上一行
+        if (curData.equals(preData)) {
+            Sheet sheet = writeSheetHolder.getSheet();
+            List<CellRangeAddress> mergeRegions = sheet.getMergedRegions();
+            boolean isMerged = false;
+            for (int i = 0; i < mergeRegions.size() && !isMerged; i++) {
+                CellRangeAddress cellRangeAddr = mergeRegions.get(i);
+                // 若上一个单元格已经被合并，则先移出原有的合并单元，再重新添加合并单元
+                if (cellRangeAddr.isInRange(curRowIndex - 1, curColIndex)) {
+                    sheet.removeMergedRegion(i);
+                    cellRangeAddr.setLastRow(curRowIndex);
+                    sheet.addMergedRegion(cellRangeAddr);
+                    isMerged = true;
+                }
+            }
+            // 若上一个单元格未被合并，则新增合并单元
+            if (!isMerged) {
+                CellRangeAddress cellRangeAddress = new CellRangeAddress(curRowIndex - 1, curRowIndex, curColIndex, curColIndex);
+                sheet.addMergedRegion(cellRangeAddress);
+            }
+        }
+    }
