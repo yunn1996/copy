@@ -1,16 +1,16 @@
  private int mergeColumnIndex; // 需要合并单元格的列索引
     private Map<String, Integer> rowIndexMap; // 记录每个数据值对应的起始行索引
-    private CellStyle centerCellStyle; // 居中对齐的单元格样式
+//    private CellStyle centerCellStyle; // 居中对齐的单元格样式
 
     public MergeStrategy(int mergeColumnIndex, Sheet sheet) {
         this.mergeColumnIndex = mergeColumnIndex;
         this.rowIndexMap = new HashMap<>();
-        this.centerCellStyle = createCenterCellStyle(sheet);
+//        this.centerCellStyle = createCenterCellStyle(sheet);
     }
 
     private CellStyle createCenterCellStyle(Sheet sheet) {
         CellStyle cellStyle = sheet.getWorkbook().createCellStyle();
-        cellStyle.setAlignment(CellStyle.ALIGN_CENTER);
+        cellStyle.setAlignment(HorizontalAlignment.CENTER);
         cellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
         return cellStyle;
     }
@@ -23,11 +23,24 @@
 
         if (rowIndexMap.containsKey(currentContent)) {
             int startRowIndex = rowIndexMap.get(currentContent);
-            CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRow.getRowNum(), mergeColumnIndex, mergeColumnIndex);
-            context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
+            CellRangeAddress existingMergedRegion = findExistingMergedRegion(context.getWriteSheetHolder().getSheet(), startRowIndex, currentRow.getRowNum(), mergeColumnIndex);
+            if (existingMergedRegion == null) {
+                CellRangeAddress cellRangeAddress = new CellRangeAddress(startRowIndex, currentRow.getRowNum(), mergeColumnIndex, mergeColumnIndex);
+                context.getWriteSheetHolder().getSheet().addMergedRegionUnsafe(cellRangeAddress);
+            }
         } else {
             rowIndexMap.put(currentContent, currentRow.getRowNum());
         }
 
-        currentCell.setCellStyle(centerCellStyle);
+//        currentCell.setCellStyle(centerCellStyle);
+    }
+
+    private CellRangeAddress findExistingMergedRegion(Sheet sheet, int firstRow, int lastRow, int column) {
+        for (int i = 0; i < sheet.getNumMergedRegions(); i++) {
+            CellRangeAddress mergedRegion = sheet.getMergedRegion(i);
+            if (mergedRegion.getFirstRow() == firstRow && mergedRegion.getLastRow() == lastRow && mergedRegion.getFirstColumn() == column) {
+                return mergedRegion;
+            }
+        }
+        return null;
     }
